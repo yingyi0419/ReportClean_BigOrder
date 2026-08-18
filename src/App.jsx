@@ -67,13 +67,21 @@ const n = (value) => nf.format(Number(value || 0));
 const p = (value) => pf.format(Number(value || 0));
 const c = (value) => cf.format(Number(value || 0));
 const COLORS = ["#e21b2d", "#f59e0b", "#111827", "#8b5cf6", "#0f766e", "#94a3b8"];
-const ATTRIBUTE_LABELS = { A: "軍營", C: "公司" };
+const ATTRIBUTE_LABELS = {
+  A: "軍營",
+  B: "金融機構",
+  C: "公司",
+  H: "醫療院所",
+  I: "政府／公營機構",
+  P: "個人",
+  S: "學校／教育機構",
+};
 const attributeLabel = (value) => {
   const raw = String(value ?? "").normalize("NFKC").trim();
   if (!raw) return "未分類";
   const code = raw.match(/^([A-Za-z])(?:\s*[｜|／/-].*)?$/)?.[1]?.toUpperCase();
   if (!code) return raw;
-  return ATTRIBUTE_LABELS[code] ? `${code}｜${ATTRIBUTE_LABELS[code]}` : `${code}｜待確認`;
+  return ATTRIBUTE_LABELS[code] ? `${code}｜${ATTRIBUTE_LABELS[code]}` : `${code}｜其他`;
 };
 
 const memberGroup = (value) => {
@@ -203,11 +211,11 @@ function Start({ onFile, loading, error }) {
   );
 }
 
-function Kpi({ Icon, label, value, note, tone = "" }) {
+function Kpi({ Icon, label, value, note, tone = "", group }) {
   return (
     <article className={`kpi ${tone}`}>
       <div>
-        <span>{label}</span>
+        <span>{group && <em>{group}</em>}{label}</span>
         <Icon />
       </div>
       <strong>{value}</strong>
@@ -360,8 +368,9 @@ function Filters({ dataset, filters, setFilters }) {
   );
 }
 
-function Overview({ rows }) {
+function Overview({ rows, filters }) {
   const summary = useMemo(() => summarize(rows), [rows]);
+  const periodLabel = `${String(filters.start || "").replaceAll("-", "/")}–${String(filters.end || "").replaceAll("-", "/")}`;
   const weeks = useMemo(() => weekly(rows), [rows]);
   const regions = useMemo(
     () => groupBy(rows, "region").sort((a, b) => b.successRate - a.successRate),
@@ -510,7 +519,7 @@ function Overview({ rows }) {
       {
         Icon: Award,
         title: "成功金額最高客戶屬性",
-        value: topAttribute ? attributeLabel(topAttribute.name) : "待確認",
+        value: topAttribute ? attributeLabel(topAttribute.name) : "無有效資料",
         text: topAttribute ? `成功消費金額 ${c(topAttribute.successAmount)}。` : "目前沒有可判定資料。",
       },
       {
@@ -528,13 +537,13 @@ function Overview({ rows }) {
       {
         Icon: ClipboardCheck,
         title: "主要成功用餐動機",
-        value: topMotive?.name || "待確認",
+        value: topMotive?.name || "無有效資料",
         text: topMotive ? `成功 ${n(topMotive.successes)} 筆，為目前主要動機。` : "目前沒有可判定資料。",
       },
       {
         Icon: BarChart3,
         title: "成功訂單主要金額區間",
-        value: topBand?.[0] || "待確認",
+        value: topBand?.[0] || "無有效資料",
         text: topBand ? `${n(topBand[1])} 筆，占成功訂單 ${p(topBand[1] / successfulWithAmount.length)}。` : "目前沒有有效成功金額。",
       },
     ];
@@ -568,7 +577,7 @@ function Overview({ rows }) {
         }),
         build("客戶屬性成功金額", Award, (allRows) => {
           const top = groupBy(allRows, "attribute").filter((item) => item.name !== "未分類").sort((a, b) => b.successAmount - a.successAmount)[0];
-          return { score: top?.successAmount ?? NaN, value: c(top?.successAmount), detail: top ? attributeLabel(top.name) : "待確認" };
+          return { score: top?.successAmount ?? NaN, value: c(top?.successAmount), detail: top ? attributeLabel(top.name) : "無有效資料" };
         }),
         build("PK 會員成功率差", ShieldCheck, (allRows) => {
           const member = summarize(allRows.filter((row) => memberGroup(row.pkMember) === "會員"));
@@ -584,13 +593,13 @@ function Overview({ rows }) {
         }),
         build("主要成功用餐動機", ClipboardCheck, (allRows) => {
           const top = groupBy(allRows, "motive").filter((item) => item.name !== "未分類").sort((a, b) => b.successes - a.successes || b.successAmount - a.successAmount)[0];
-          return { score: top?.successes ?? NaN, value: `${n(top?.successes)} 筆`, detail: top?.name || "待確認" };
+          return { score: top?.successes ?? NaN, value: `${n(top?.successes)} 筆`, detail: top?.name || "無有效資料" };
         }),
         build("成功訂單主要金額區間", BarChart3, (allRows) => {
           const counts = new Map();
           allRows.filter((row) => row.isSuccess && row.amount != null).forEach((row) => counts.set(amountBand(row.amount), (counts.get(amountBand(row.amount)) || 0) + 1));
           const top = [...counts].sort((a, b) => b[1] - a[1])[0];
-          return { score: top?.[1] ?? NaN, value: `${n(top?.[1])} 筆`, detail: top?.[0] || "待確認" };
+          return { score: top?.[1] ?? NaN, value: `${n(top?.[1])} 筆`, detail: top?.[0] || "無有效資料" };
         }),
       ];
       return { ...config, metrics };
@@ -609,22 +618,34 @@ function Overview({ rows }) {
     topAcByAmount && `AC 層級由 ${topAcByAmount.name} 成功金額最高，請獨立整理其高價值客群與轉換話術。`,
     topStoreByAmount && `餐廳層級由 ${topStoreByAmount.name} 成功金額最高，請追蹤訂單來源與可複製商圈。`,
     secondAmountRegion && topAmountRegion && `${topAmountRegion.name}領先第二名 ${c(topAmountRegion.successAmount - secondAmountRegion.successAmount)}，請拆解客群、話術與訂單來源。`,
-    topSingleOrder && `最高單筆 ${c(topSingleOrder.amount)} 來自 ${topSingleOrder.store || "未分類"}／${attributeLabel(topSingleOrder.attribute)}／${topSingleOrder.target || "待確認"}，建議建立相似名單。`,
+    topSingleOrder && `最高單筆 ${c(topSingleOrder.amount)} 來自 ${topSingleOrder.store || "未分類"}／${attributeLabel(topSingleOrder.attribute)}／${topSingleOrder.target || "未提供對象"}，建議建立相似名單。`,
     amountCoverage < 1 && `仍有 ${n(summary.missingAmount)} 筆成功資料缺金額，先補齊以避免貢獻度低估。`,
   ].filter(Boolean).slice(0, 5);
   const pieLabel = ({ name, percent }) =>
     percent >= 0.06 ? `${name} ${p(percent)}` : "";
   return (
     <div className="stack">
-      <section className="kpi-grid">
-        <Kpi Icon={Activity} label="有效拜訪筆數" value={n(summary.visits)} note="依目前篩選條件" />
-        <Kpi Icon={CheckCircle2} label="成功拜訪筆數" value={n(summary.successes)} note="訂餐日晚於電訪日" tone="red" />
-        <Kpi Icon={Target} label="成功率" value={p(summary.successRate)} note={`成功 ${n(summary.successes)}／拜訪 ${n(summary.visits)}`} tone="dark" />
-        <Kpi Icon={CircleDollarSign} label="成功消費金額" value={c(summary.successAmount)} note={`${n(summary.amountRows)} 筆有有效金額`} tone="red" />
-        <Kpi Icon={TrendingUp} label="成功平均金額" value={c(summary.averageAmount)} note={summary.missingAmount ? `${n(summary.missingAmount)} 筆成功資料缺金額` : "金額完整"} />
-        <Kpi Icon={UsersRound} label="同意受訪率" value={p(summary.consentRate)} note={`${n(summary.consented)} 筆同意受訪`} />
-        <Kpi Icon={AlertCircle} label="未轉換拜訪" value={n(pending)} note={`占全部拜訪 ${p(summary.visits ? pending / summary.visits : 0)}`} />
-        <Kpi Icon={FileCheck2} label="成功金額完整率" value={p(amountCoverage)} note={`${n(summary.amountRows)}／${n(summary.successes)} 筆具金額`} tone="dark" />
+      <section className="kpi-command">
+        <div className="kpi-command-head">
+          <div><span>MARKET KPI COMMAND</span><h2>全市場核心 KPI 戰情</h2></div>
+          <b><CalendarDays />分析期間｜{periodLabel}</b>
+        </div>
+        <div className="kpi-grid">
+          <Kpi Icon={CircleDollarSign} group="成果規模" label="成功消費金額" value={c(summary.successAmount)} note={`${n(summary.amountRows)} 筆有效金額｜平均 ${c(summary.averageAmount)}`} tone="red" />
+          <Kpi Icon={Target} group="轉換效率" label="拜訪成功率" value={p(summary.successRate)} note={`成功 ${n(summary.successes)}／有效拜訪 ${n(summary.visits)}`} tone="dark" />
+          <Kpi Icon={CheckCircle2} group="成果規模" label="成功拜訪筆數" value={n(summary.successes)} note={`占全部拜訪 ${p(summary.visits ? summary.successes / summary.visits : 0)}`} />
+          <Kpi Icon={TrendingUp} group="單筆價值" label="成功平均金額" value={c(summary.averageAmount)} note={`成功總額 ÷ ${n(summary.amountRows)} 筆有效金額`} />
+          <Kpi Icon={Activity} group="市場觸及" label="有效拜訪筆數" value={n(summary.visits)} note={`目前篩選期間共 ${n(summary.visits)} 筆`} />
+          <Kpi Icon={UsersRound} group="前端互動" label="同意受訪率" value={p(summary.consentRate)} note={`${n(summary.consented)} 筆同意｜${n(summary.visits - summary.consented)} 筆未同意`} />
+          <Kpi Icon={AlertCircle} group="轉換缺口" label="未轉換拜訪" value={n(pending)} note={`未轉換率 ${p(summary.visits ? pending / summary.visits : 0)}`} />
+          <Kpi Icon={FileCheck2} group="資料品質" label="成功金額完整率" value={p(amountCoverage)} note={`${n(summary.amountRows)}／${n(summary.successes)} 筆具金額`} tone={amountCoverage >= .98 ? "quality" : "warning"} />
+        </div>
+        <div className="kpi-pulse">
+          <div><span>區域金額冠軍</span><b>{topAmountRegion?.name || "—"}</b><strong>{c(topAmountRegion?.successAmount)}</strong></div>
+          <div><span>AC 金額冠軍</span><b>{topAcByAmount?.name || "—"}</b><strong>{c(topAcByAmount?.successAmount)}</strong></div>
+          <div><span>餐廳金額冠軍</span><b>{topStoreByAmount?.name || "—"}</b><strong>{c(topStoreByAmount?.successAmount)}</strong></div>
+          <div><span>市場轉換缺口</span><b>{n(pending)} 筆未成功</b><strong>{p(summary.visits ? pending / summary.visits : 0)}</strong></div>
+        </div>
       </section>
       {!rows.length ? (
         <div className="no-data">
@@ -636,22 +657,22 @@ function Overview({ rows }) {
         <>
           <section className="executive-snapshot">
             <article className="panel executive-leaders">
-              <PanelTitle kicker="EXECUTIVE SNAPSHOT" title="各層級營運冠軍速覽" meta="四項獨立排名，不代表隸屬關係" />
+              <PanelTitle kicker="EXECUTIVE SNAPSHOT" title="各層級營運冠軍速覽" period={periodLabel} meta="四項獨立排名，不代表隸屬關係" />
               <div className="executive-leader-grid">
                 {[
                   ["區域貢獻冠軍", topAmountRegion?.name, c(topAmountRegion?.successAmount), `全市場 ${p(topAmountRegion?.amountShare)}｜成功率 ${p(topAmountRegion?.successRate)}`],
                   ["AC 貢獻冠軍", topAcByAmount?.name, c(topAcByAmount?.successAmount), `成功 ${n(topAcByAmount?.successes)} 筆｜成功率 ${p(topAcByAmount?.successRate)}`],
                   ["餐廳貢獻冠軍", topStoreByAmount?.name, c(topStoreByAmount?.successAmount), `成功 ${n(topStoreByAmount?.successes)} 筆｜成功率 ${p(topStoreByAmount?.successRate)}`],
-                  ["最高成功單筆", topSingleOrder?.store || "待確認", c(topSingleOrder?.amount), `${attributeLabel(topSingleOrder?.attribute)}｜${topSingleOrder?.target || "來源待確認"}`],
+                  ["最高成功單筆", topSingleOrder?.store || "未提供餐廳", c(topSingleOrder?.amount), `${attributeLabel(topSingleOrder?.attribute)}｜${topSingleOrder?.target || "未提供對象"}`],
                 ].map(([label, name, value, note], index) => (
                   <div className="executive-leader" key={label}>
-                    <i>{index + 1}</i><span>{label}</span><strong>{name || "待確認"}</strong><b>{value}</b><small>{note}</small>
+                    <i>{index + 1}</i><span>{label}</span><strong>{name || "無有效資料"}</strong><b>{value}</b><small>{note}</small>
                   </div>
                 ))}
               </div>
             </article>
             <article className="panel executive-actions">
-              <PanelTitle kicker="DECISION ACTION" title="管理行動提醒" meta="依目前篩選結果自動產生" />
+              <PanelTitle kicker="DECISION ACTION" title="管理行動提醒" period={periodLabel} meta="依目前篩選結果自動產生" />
               <ol>
                 {managementActions.map((action, index) => <li key={action}><b>{String(index + 1).padStart(2, "0")}</b><span>{action}</span></li>)}
               </ol>
@@ -659,7 +680,7 @@ function Overview({ rows }) {
           </section>
           <section className="chart-grid">
             <article className="panel wide">
-              <PanelTitle kicker="WEEKLY TREND" title="每週拜訪與成功趨勢" meta="週一為每週起始日" />
+              <PanelTitle kicker="WEEKLY TREND" title="每週拜訪與成功趨勢" period={periodLabel} meta="週一為每週起始日" />
               <div className="chart">
                 <ResponsiveContainer>
                   <AreaChart data={weeks} margin={{ top: 30, right: 18, left: -8, bottom: 0 }}>
@@ -689,7 +710,7 @@ function Overview({ rows }) {
               </div>
             </article>
             <article className="panel">
-              <PanelTitle kicker="CONVERSION" title="區域成功率" />
+              <PanelTitle kicker="CONVERSION" title="區域成功率" period={periodLabel} />
               <div className="chart">
                 <ResponsiveContainer>
                   <BarChart data={regions} layout="vertical" margin={{ left: 4, right: 58 }}>
@@ -707,7 +728,7 @@ function Overview({ rows }) {
           </section>
           <section className="lower-grid">
             <article className="panel">
-              <PanelTitle kicker="CUSTOMER MIX" title="客戶類型結構" />
+              <PanelTitle kicker="CUSTOMER MIX" title="客戶類型結構" period={periodLabel} />
               <div className="donut">
                 <ResponsiveContainer>
                   <PieChart>
@@ -737,7 +758,7 @@ function Overview({ rows }) {
               </div>
             </article>
             <article className="panel">
-              <PanelTitle kicker="FUNNEL" title="拜訪轉換漏斗" />
+              <PanelTitle kicker="FUNNEL" title="拜訪轉換漏斗" period={periodLabel} />
               <div className="funnel">
                 {[
                   ["有效拜訪", summary.visits, 100],
@@ -755,7 +776,7 @@ function Overview({ rows }) {
             </article>
             <article className="panel quick">
               <div className="quick-heading">
-                <PanelTitle kicker="MARKET OVERVIEW" title="全市場整體洞察" meta="只呈現市場結果，不混合組織層級" />
+                <PanelTitle kicker="MARKET OVERVIEW" title="全市場整體洞察" period={periodLabel} meta="只呈現市場結果，不混合組織層級" />
                 <div className="brand-stripes" aria-hidden="true"><i /><i /><i /></div>
               </div>
               <div className="quick-insights">
@@ -795,12 +816,12 @@ function Overview({ rows }) {
           <section className="battlefield-stack">
             {battlefieldSections.map((section) => (
               <article className="panel battlefield-panel" key={section.key}>
-                <PanelTitle kicker={section.kicker} title={`${section.title}｜六大面向戰情排行`} meta={`TOP 3｜最低 ${section.minimum} 筆拜訪｜各層級獨立統計`} />
+                <PanelTitle kicker={section.kicker} title={`${section.title}｜六大面向戰情排行`} period={periodLabel} meta={`TOP 3｜最低 ${section.minimum} 筆拜訪｜各層級獨立統計`} />
                 <div className="battlefield-note"><Info />本區只比較同一層級，不表示區域、AC、餐廳之間存在組織隸屬關係。</div>
                 <div className="battlefield-grid">
                   {section.metrics.map(({ title, Icon, leaders }) => (
                     <section className="battlefield-metric" key={title}>
-                      <header><Icon /><strong>{title}</strong></header>
+                      <header><Icon /><strong>{title}</strong><small>{periodLabel}</small></header>
                       <div className="battlefield-ranking">
                         {leaders.length ? leaders.map((leader, index) => (
                           <div className="battlefield-rank" key={leader.name}>
@@ -817,7 +838,7 @@ function Overview({ rows }) {
             ))}
           </section>
           <section className="panel contribution-panel">
-            <PanelTitle kicker="REGIONAL CONTRIBUTION" title="六區成功貢獻拆解" meta="區域層級獨立比較｜成功金額由高至低" />
+            <PanelTitle kicker="REGIONAL CONTRIBUTION" title="六區成功貢獻拆解" period={periodLabel} meta="區域層級獨立比較｜成功金額由高至低" />
             <div className="contribution-table">
               <table>
                 <thead>
@@ -839,7 +860,7 @@ function Overview({ rows }) {
             </div>
           </section>
           <section className="panel hierarchy-leader-panel">
-            <PanelTitle kicker="MARKET COMMAND VIEW" title="各層級關鍵指標冠軍" meta="區域、AC、餐廳分開判讀｜成功率採最低樣本門檻，避免小樣本失真" />
+            <PanelTitle kicker="MARKET COMMAND VIEW" title="各層級關鍵指標冠軍" period={periodLabel} meta="區域、AC、餐廳分開判讀｜成功率採最低樣本門檻，避免小樣本失真" />
             <div className="hierarchy-leader-grid">
               {[
                 ["區域表現優", levelChampions.region, "全市場區域", false],
@@ -858,7 +879,7 @@ function Overview({ rows }) {
                       return (
                         <div className="champion-row" key={label}>
                           <div className="champion-title"><Award /><span>{label}</span></div>
-                          <strong>{item?.name || "待確認"}</strong>
+                          <strong>{item?.name || "無有效資料"}</strong>
                           <div className="champion-kpis">
                             <b>{metric === "amount" ? c(item?.successAmount) : metric === "count" ? `${n(item?.successes)} 筆` : p(item?.successRate)}</b>
                             <span>成功金額 {c(item?.successAmount)}｜成功 {n(item?.successes)} 筆｜成功率 {p(item?.successRate)}</span>
@@ -866,7 +887,7 @@ function Overview({ rows }) {
                           {order && (
                             <div className="champion-source">
                               <em>最高單筆 {c(order.amount)}</em>
-                              <span>屬性 {attributeLabel(order.attribute)}｜來自 {order.target || "待確認"}</span>
+                              <span>屬性 {attributeLabel(order.attribute)}｜來自 {order.target || "未提供對象"}</span>
                               <span>{order.region || "未分類"}｜{order.ac || "未分類"}｜Excel 第 {n(order.rowNumber)} 列</span>
                             </div>
                           )}
@@ -885,6 +906,7 @@ function Overview({ rows }) {
               title="AC 表現亮眼名單"
               data={acLeaders}
               threshold="最低 20 筆拜訪"
+              period={periodLabel}
             />
             <PerformanceLeaders
               Icon={Store}
@@ -892,10 +914,11 @@ function Overview({ rows }) {
               title="餐廳表現亮眼名單"
               data={storeLeaders}
               threshold="最低 5 筆拜訪"
+              period={periodLabel}
             />
           </section>
           <section className="panel top-orders-panel">
-            <PanelTitle kicker="TOP SUCCESS ORDERS" title="最佳成功訂單金額來源" meta="依成功訂單金額由高至低｜顯示前 8 筆" />
+            <PanelTitle kicker="TOP SUCCESS ORDERS" title="最佳成功訂單金額來源" period={periodLabel} meta="依成功訂單金額由高至低｜顯示前 8 筆" />
             <div className="top-orders-table">
               <table>
                 <thead><tr><th>排名</th><th>成功金額</th><th>區域</th><th>AC</th><th>餐廳</th><th>屬性</th><th>客戶／電訪對象</th><th>電訪日期</th><th>訂餐日期</th><th>成功天數差</th><th>來源資料列</th></tr></thead>
@@ -918,10 +941,10 @@ function Overview({ rows }) {
   );
 }
 
-function PerformanceLeaders({ Icon, kicker, title, data, threshold }) {
+function PerformanceLeaders({ Icon, kicker, title, data, threshold, period }) {
   return (
     <article className="panel performance-panel">
-      <PanelTitle kicker={kicker} title={title} meta={`${threshold}｜依成功筆數排序`} />
+      <PanelTitle kicker={kicker} title={title} period={period} meta={`${threshold}｜依成功筆數排序`} />
       {data.length ? (
         <div className="performance-list">
           {data.map((item, index) => {
@@ -953,7 +976,7 @@ function PerformanceLeaders({ Icon, kicker, title, data, threshold }) {
               {topOrder && (
                 <div className="performance-detail">
                   <small>最高單筆 {c(topOrder.amount)}</small>
-                  <b>{attributeLabel(topOrder.attribute)}｜{topOrder.target || "待確認"}</b>
+                  <b>{attributeLabel(topOrder.attribute)}｜{topOrder.target || "未提供對象"}</b>
                   <span>{topOrder.region || "未分類"}／{topOrder.ac || "未分類"}／第 {n(topOrder.rowNumber)} 列</span>
                 </div>
               )}
@@ -968,12 +991,12 @@ function PerformanceLeaders({ Icon, kicker, title, data, threshold }) {
   );
 }
 
-function PanelTitle({ kicker, title, meta }) {
+function PanelTitle({ kicker, title, meta, period }) {
   return (
     <div className="panel-title">
       <div>
         <span>{kicker}</span>
-        <h2>{title}</h2>
+        <div className="panel-heading-line"><h2>{title}</h2>{period && <b className="period-badge"><CalendarDays />{period}</b>}</div>
       </div>
       {meta && <small>{meta}</small>}
     </div>
@@ -1278,7 +1301,7 @@ export default function App() {
               <div><span>{tabs.find(([id]) => id === tab)?.[2]}</span><h1>{filters.region || "全市場"}{filters.ac ? `／${filters.ac}` : ""}{filters.store ? `／${filters.store}` : ""}</h1></div>
               <div><Info /> 成功拜訪定義：<b>訂餐日期 &gt; 電訪日期</b></div>
             </div>
-            {tab === "overview" && <Overview rows={rows} />}
+            {tab === "overview" && <Overview rows={rows} filters={filters} />}
             {tab === "hierarchy" && <Hierarchy rows={rows} onDrill={drill} />}
             {tab === "details" && <Details rows={rows} />}
             {tab === "diagnostics" && <Diagnostics dataset={dataset} />}
