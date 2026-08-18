@@ -1,0 +1,28 @@
+{
+  "name": "kfc-bulk-visit-analysis",
+  "version": "1.12.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "build:static": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/data-engine.test.mjs",
+    "validate:workbook": "node scripts/validate-workbook.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "0.468.0",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "recharts": "3.1.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.0.2",
+    "vite": "8.0.13"
+  }
+}
