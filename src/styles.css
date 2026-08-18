@@ -216,6 +216,10 @@ nav { position: sticky; top: 82px; z-index: 15; border-bottom: 1px solid var(--l
 .battlefield-metric > header svg { width:21px; height:21px; flex:0 0 auto; }
 .battlefield-metric > header strong { font-size:16px; }
 .battlefield-metric > header small { margin-left:auto; padding:4px 7px; border:1px solid #ffffff45; border-radius:6px; color:#fff; background:#ffffff16; font:800 10px Arial,sans-serif; white-space:nowrap; }
+.market-benchmark { min-height:66px; padding:11px 14px; border-bottom:1px solid #eadfdb; display:grid; grid-template-columns:auto 1fr; align-items:center; gap:3px 11px; background:linear-gradient(135deg,#fff7f5 0%,#fff 100%); }
+.market-benchmark span { color:#8f1724; font-size:11px; font-weight:900; }
+.market-benchmark b { justify-self:end; color:#b51224; font:900 22px Arial,sans-serif; white-space:nowrap; }
+.market-benchmark small { grid-column:1/-1; color:#74676a; font-size:11px; font-weight:700; }
 .battlefield-ranking { padding:7px 14px 11px; }
 .battlefield-ranking > p { margin:18px 4px; color:var(--muted); font-size:12px; }
 .battlefield-rank { min-height:70px; padding:10px 0; border-bottom:1px solid #eee8e6; display:grid; grid-template-columns:31px minmax(0,1fr) auto; align-items:center; gap:9px; }

@@ -550,15 +550,19 @@ function Overview({ rows, filters }) {
   }, [rows, summary.successAmount]);
   const battlefieldSections = useMemo(() => {
     const configs = [
-      { key: "region", title: "By 區域（RC）", kicker: "RC BATTLEFIELD", minimum: 30 },
-      { key: "ac", title: "By AC", kicker: "AC BATTLEFIELD", minimum: 20 },
-      { key: "store", title: "By 餐廳", kicker: "STORE BATTLEFIELD", minimum: 5 },
+      { key: "region", title: "By 區域（RC）", kicker: "RC BATTLEFIELD", minimum: 0, limit: 6, meta: "六區完整比較｜全市場值為比較基準" },
+      { key: "ac", title: "By AC", kicker: "AC BATTLEFIELD", minimum: 20, limit: 3, meta: "TOP 3｜最低 20 筆拜訪｜獨立統計" },
+      { key: "store", title: "By 餐廳", kicker: "STORE BATTLEFIELD", minimum: 5, limit: 3, meta: "TOP 3｜最低 5 筆拜訪｜獨立統計" },
     ];
     const newCustomer = (row) => /新|new/i.test(row.customerType || "");
-    const ranked = (items) => items
-      .filter((item) => Number.isFinite(item.score))
-      .sort((a, b) => b.score - a.score || b.tie - a.tie)
-      .slice(0, 3);
+    const ranked = (items, limit, keepAll = false) => items
+      .filter((item) => keepAll || Number.isFinite(item.score))
+      .sort((a, b) => {
+        const aScore = Number.isFinite(a.score) ? a.score : -Infinity;
+        const bScore = Number.isFinite(b.score) ? b.score : -Infinity;
+        return bScore - aScore || b.tie - a.tie;
+      })
+      .slice(0, limit);
 
     return configs.map((config) => {
       const eligible = groupBy(rows, config.key)
@@ -567,7 +571,8 @@ function Overview({ rows, filters }) {
       const build = (title, Icon, evaluate) => ({
         title,
         Icon,
-        leaders: ranked(eligible.map(({ name, allRows }) => ({ name, tie: summarize(allRows).successAmount, ...evaluate(allRows) }))),
+        market: evaluate(rows),
+        leaders: ranked(eligible.map(({ name, allRows }) => ({ name, tie: summarize(allRows).successAmount, ...evaluate(allRows) })), config.limit, config.key === "region"),
       });
 
       const metrics = [
@@ -816,12 +821,19 @@ function Overview({ rows, filters }) {
           <section className="battlefield-stack">
             {battlefieldSections.map((section) => (
               <article className="panel battlefield-panel" key={section.key}>
-                <PanelTitle kicker={section.kicker} title={`${section.title}｜六大面向戰情排行`} period={periodLabel} meta={`TOP 3｜最低 ${section.minimum} 筆拜訪｜各層級獨立統計`} />
+                <PanelTitle kicker={section.kicker} title={`${section.title}｜六大面向戰情排行`} period={periodLabel} meta={section.meta} />
                 <div className="battlefield-note"><Info />本區只比較同一層級，不表示區域、AC、餐廳之間存在組織隸屬關係。</div>
                 <div className="battlefield-grid">
-                  {section.metrics.map(({ title, Icon, leaders }) => (
+                  {section.metrics.map(({ title, Icon, leaders, market }) => (
                     <section className="battlefield-metric" key={title}>
                       <header><Icon /><strong>{title}</strong><small>{periodLabel}</small></header>
+                      {section.key === "region" && (
+                        <div className="market-benchmark">
+                          <span>全市場值</span>
+                          <b>{market.value}</b>
+                          <small>{market.detail}</small>
+                        </div>
+                      )}
                       <div className="battlefield-ranking">
                         {leaders.length ? leaders.map((leader, index) => (
                           <div className="battlefield-rank" key={leader.name}>
