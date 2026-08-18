@@ -368,6 +368,43 @@ function Filters({ dataset, filters, setFilters }) {
   );
 }
 
+function RegionBattleChart({ leaders, market }) {
+  const scores = [...leaders.map((item) => item.score), market?.score].filter(Number.isFinite);
+  const rawMin = Math.min(0, ...scores);
+  const rawMax = Math.max(0, ...scores);
+  const padding = Math.max((rawMax - rawMin) * 0.08, Math.abs(rawMax) * 0.03, 0.01);
+  const min = rawMin < 0 ? rawMin - padding : 0;
+  const max = rawMax + padding;
+  const range = max - min || 1;
+  const position = (value) => ((value - min) / range) * 100;
+  const zero = position(0);
+  const marketPosition = Number.isFinite(market?.score) ? position(market.score) : null;
+
+  return (
+    <div className="region-battle-chart">
+      <div className="region-chart-legend"><i />六區表現<span /><b>全市場基準線</b></div>
+      {leaders.map((leader) => {
+        const valuePosition = Number.isFinite(leader.score) ? position(leader.score) : zero;
+        const left = Math.min(zero, valuePosition);
+        const width = Math.max(Math.abs(valuePosition - zero), Number.isFinite(leader.score) ? 1.5 : 0);
+        return (
+          <div className="region-chart-row" key={leader.name}>
+            <div className="region-chart-label"><b>{leader.name}</b><small>{leader.detail}</small></div>
+            <div className="region-chart-plot">
+              <div className="region-chart-track">
+                <i className="zero-line" style={{ left: `${zero}%` }} />
+                {marketPosition != null && <i className="market-line" style={{ left: `${marketPosition}%` }} />}
+                <span className={leader.score < 0 ? "negative" : ""} style={{ left: `${left}%`, width: `${width}%` }} />
+              </div>
+            </div>
+            <strong>{leader.value}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function Overview({ rows, filters }) {
   const summary = useMemo(() => summarize(rows), [rows]);
   const periodLabel = `${String(filters.start || "").replaceAll("-", "/")}–${String(filters.end || "").replaceAll("-", "/")}`;
@@ -834,7 +871,9 @@ function Overview({ rows, filters }) {
                           <small>{market.detail}</small>
                         </div>
                       )}
-                      <div className="battlefield-ranking">
+                      {section.key === "region" ? (
+                        <RegionBattleChart leaders={leaders} market={market} />
+                      ) : <div className="battlefield-ranking">
                         {leaders.length ? leaders.map((leader, index) => (
                           <div className="battlefield-rank" key={leader.name}>
                             <i className={index === 0 ? "top" : ""}>{index + 1}</i>
@@ -842,7 +881,7 @@ function Overview({ rows, filters }) {
                             <strong>{leader.value}</strong>
                           </div>
                         )) : <p>目前沒有符合樣本門檻的資料。</p>}
-                      </div>
+                      </div>}
                     </section>
                   ))}
                 </div>

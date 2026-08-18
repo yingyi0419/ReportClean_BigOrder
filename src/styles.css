@@ -220,6 +220,23 @@ nav { position: sticky; top: 82px; z-index: 15; border-bottom: 1px solid var(--l
 .market-benchmark span { color:#8f1724; font-size:11px; font-weight:900; }
 .market-benchmark b { justify-self:end; color:#b51224; font:900 22px Arial,sans-serif; white-space:nowrap; }
 .market-benchmark small { grid-column:1/-1; color:#74676a; font-size:11px; font-weight:700; }
+.region-battle-chart { padding:11px 14px 14px; }
+.region-chart-legend { min-height:24px; margin-bottom:4px; display:flex; align-items:center; justify-content:flex-end; gap:6px; color:#75696c; font-size:9px; font-weight:800; }
+.region-chart-legend i { width:18px; height:7px; border-radius:4px; background:linear-gradient(90deg,#ba1123,#ef2638); }
+.region-chart-legend span { width:2px; height:14px; margin-left:7px; background:#111827; }
+.region-chart-legend b { color:#4d4547; }
+.region-chart-row { min-height:63px; padding:8px 0; border-bottom:1px solid #eee8e6; display:grid; grid-template-columns:94px minmax(90px,1fr) 74px; align-items:center; gap:10px; }
+.region-chart-row:last-child { border-bottom:0; }
+.region-chart-label { min-width:0; }
+.region-chart-label b { display:block; color:#292123; font-size:14px; }
+.region-chart-label small { display:block; margin-top:3px; overflow:hidden; color:#75696c; font-size:9px; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+.region-chart-plot { min-width:0; }
+.region-chart-track { position:relative; height:18px; border-radius:9px; background:#f1eeed; overflow:visible; }
+.region-chart-track > span { position:absolute; top:3px; height:12px; min-width:0; border-radius:6px; background:linear-gradient(90deg,#a70f20,#ed2437); box-shadow:0 3px 8px #e21b2d26; }
+.region-chart-track > span.negative { background:linear-gradient(90deg,#f59e0b,#d97706); }
+.region-chart-track > i { position:absolute; z-index:2; top:-4px; bottom:-4px; width:1px; background:#c8c3c2; }
+.region-chart-track > i.market-line { width:2px; background:#111827; box-shadow:0 0 0 2px #ffffffaa; }
+.region-chart-row > strong { color:#b51224; font:900 15px Arial,sans-serif; text-align:right; white-space:nowrap; }
 .battlefield-ranking { padding:7px 14px 11px; }
 .battlefield-ranking > p { margin:18px 4px; color:var(--muted); font-size:12px; }
 .battlefield-rank { min-height:70px; padding:10px 0; border-bottom:1px solid #eee8e6; display:grid; grid-template-columns:31px minmax(0,1fr) auto; align-items:center; gap:9px; }
@@ -430,6 +447,7 @@ footer span:first-child { color:var(--ink); font-weight:700; }
   .kpi-pulse>div:last-child{border-bottom:0}
   .exports{grid-template-columns:1fr}
   .executive-leader-grid{grid-template-columns:1fr}
+  .region-chart-row{grid-template-columns:74px minmax(80px,1fr) 62px;gap:7px}
   .executive-leader{border-right:0;border-bottom:1px solid #eee5e2}
   .executive-leader:last-child{border-bottom:0}
   footer{padding:15px 0;align-items:flex-start;flex-direction:column;justify-content:center;gap:5px}
